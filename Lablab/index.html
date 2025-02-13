@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Minggulay</title>
+  <!-- Using Poppins for a clean, readable font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    /* Basic Reset */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #ffd6e7; /* Soft pink for the mini-game */
+      color: #000;
+      text-align: center;
+      transition: background 1s ease;
+      overflow-x: hidden; /* no horizontal scroll */
+    }
+
+    /* Name Entry UI (visible at start) */
+    #nameEntry {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 20;
+    }
+    #nameEntry input {
+      font-size: 1.2em;
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    #nameEntry button {
+      font-size: 1.2em;
+      padding: 10px 20px;
+      margin-left: 10px;
+      background: #ff69b4;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    /* Mini Game Container (hidden until Start Game) */
+    #miniGameContainer {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+    }
+    #gameCanvas {
+      background: #ffeaf2;
+      border: 2px solid #000;
+      border-radius: 5px;
+      display: block;
+      margin: 0 auto;
+      width: 90vw;
+      height: 90vh;
+      max-width: 1200px;
+      max-height: 800px;
+    }
+
+    /* Continue & Skip Buttons */
+    #continueBtn, #skipBtn {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 1em;
+      border: none;
+      border-radius: 5px;
+      color: #fff;
+      cursor: pointer;
+    }
+    #continueBtn {
+      background: #ff69b4;
+      display: none; /* shown after collecting all cat foods */
+    }
+    #skipBtn {
+      background: #ffb6c1;
+      display: inline-block;
+    }
+
+    /* Counter (top-left) */
+    #counter {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 1.2em;
+      color: #000;
+      text-shadow: 1px 1px 2px #fff;
+      z-index: 15;
+    }
+
+    /* Petals container (during the game) */
+    #petals {
+      position: fixed;
+      top: 0; 
+      left: 0;
+      width: 100%; 
+      height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 2;
+    }
+    .petal {
+      position: fixed;
+      top: -50px;
+      pointer-events: none;
+      animation: fall linear infinite;
+    }
+    @keyframes fall {
+      0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+    }
+
+    /* Dim Overlay (shown after Continue/Skip) */
+    #dimOverlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; 
+      height: 100%;
+      background: rgba(0,0,0,0.5); /* semi-transparent black */
+      z-index: 98; /* behind final scene but above the game */
+    }
+
+    /* Final Scene: a smaller centered box above the dim overlay */
+    #finalScene {
+      display: none;
+      position: absolute; /* center it */
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90%;
+      max-width: 800px;
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px;
+      z-index: 99;
+      text-align: center;
+      box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    }
+    .surpriseContent {
+      margin-bottom: 20px;
+    }
+    .surpriseContent h1 {
+      font-size: 1.8em;
+      margin-bottom: 0.5em;
+      color: #e60073;
+    }
+    .surpriseContent p {
+      font-size: 1.2em;
+      line-height: 1.5;
+      margin: 1em 0;
+    }
+
+    /* Slideshow container (9 images) */
+    #slideshowContainer {
+      width: 90%;
+      max-width: 720px;
+      margin: 0 auto 20px auto;
+    }
+    #slideshowContainer img {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      height: auto;
+      object-fit: contain;
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
+    #slideshowContainer img.active { opacity: 1; }
+
+    /* Animated Cat Emoji in final scene */
+    .catEmoji {
+      font-size: 4em;
+      margin-top: 10px;
+      animation: bounce 2s infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+    }
+
+    /* Responsive for smaller screens */
+    @media (max-width: 600px) {
+      #finalScene {
+        width: 95%;
+        max-width: 95%;
+      }
+      .surpriseContent h1 { font-size: 1.4em; }
+      .surpriseContent p { font-size: 1em; }
+      .catEmoji { font-size: 3em; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Name Entry UI -->
+  <div id="nameEntry">
+    <input type="text" id="playerName" placeholder="Enter your name" />
+    <button id="startBtn">Start Game</button>
+  </div>
+
+  <!-- Counter (top-left) -->
+  <div id="counter">Cat food: 0/143   <br> Lives: 9</div>
+
+  <!-- Mini Game Container -->
+  <div id="miniGameContainer">
+    <canvas id="gameCanvas"></canvas>
+    <br>
+    <button id="continueBtn">Continue</button>
+    <button id="skipBtn">Skip Game</button>
+  </div>
+
+  <!-- Petals container -->
+  <div id="petals"></div>
+
+  <!-- Dim Overlay -->
+  <div id="dimOverlay"></div>
+
+  <!-- Final Scene (centered box) -->
+  <div id="finalScene">
+    <div class="surpriseContent">
+      <h1>Happy Valentine's Day!!</h1>
+      <p>I hope na enjoy mo yung mini game HAHAHAHHAHA</p>
+      <p>Finish your exam and lets date soon!!!</p>
+      <p>Happy Valentine's Lablab!!! I love youuuuu mwaaa😽</p>
+      <!-- Bouncing cat emoji -->
+      <div class="catEmoji">😺</div>
+    </div>
+    <!-- Slideshow container -->
+    <div id="slideshowContainer"></div>
+  </div>
+
+  <!-- Background music -->
+  <audio id="bgMusic" loop>
+    <source src="snowspring.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+
+  <!-- Eat sound -->
+  <audio id="eatSound">
+    <source src="data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YRAAAAAA" type="audio/wav">
+    Your browser does not support the audio element.
+  </audio>
+
+  <script>
+    console.log("Page loaded.");
+
+    /********** DOM REFERENCES **********/
+    const nameEntry = document.getElementById("nameEntry");
+    const playerNameInput = document.getElementById("playerName");
+    const startBtn = document.getElementById("startBtn");
+    const miniGameContainer = document.getElementById("miniGameContainer");
+    const continueBtn = document.getElementById("continueBtn");
+    const skipBtn = document.getElementById("skipBtn");
+    const counterDiv = document.getElementById("counter");
+    const dimOverlay = document.getElementById("dimOverlay");
+    const finalScene = document.getElementById("finalScene");
+    const slideshowContainer = document.getElementById("slideshowContainer");
+    const petalsContainer = document.getElementById("petals");
+    const bgMusic = document.getElementById("bgMusic");
+    const eatSound = document.getElementById("eatSound");
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    /********** GAME STATE VARIABLES **********/
+    let playerName = "";
+    let gameSolved = false;
+    let frameCount = 0;
+
+    // Slideshow images (9 total)
+    const slideshowImages = [
+      "us1.jpg","us2.jpg","us3.jpg",
+      "us4.jpg","us5.jpg","us6.jpg",
+      "us7.jpg","us8.jpg","us9.jpg"
+    ];
+    let currentSlideIndex = 0;
+
+    // Cat/dog mini-game
+    let catFoodsEaten = 0;
+    const totalCatFoods = 143;
+    let catFoodsSpawned = 0;
+    let catFoodsOnField = [];
+    let lives = 9;
+
+    // Cat emojis for the mini-game character
+    const catEmojiFrame0 = "🐱";
+    const catEmojiFrame1 = "😺";
+    let catFrameIndex = 0;
+
+    // Character bounding box
+    const character = {
+      x: 50, y: 50,
+      width: 64, height: 64,
+      speed: 6
+    };
+    // Dog obstacle
+    let obstacle = {
+      x: 100, y: 100,
+      width: 50, height: 50,
+      speedX: 2, speedY: 2
+    };
+    let keys = {};
+
+    /********** START GAME **********/
+    startBtn.addEventListener("click", function() {
+      playerName = playerNameInput.value.trim();
+      if (!playerName) {
+        alert("Please enter your name to start the game!");
+        return;
+      }
+      console.log("Start Game clicked. Player: " + playerName);
+      nameEntry.style.display = "none";
+      miniGameContainer.style.display = "block";
+      resizeCanvas();
+      requestAnimationFrame(gameLoop);
+      generatePetals();
+    });
+
+    /********** GENERATE PETALS **********/
+    function generatePetals() {
+      const petalCount = 30;
+      for (let i = 0; i < petalCount; i++) {
+        const petal = document.createElement("div");
+        petal.classList.add("petal");
+        petal.innerHTML = "🌸";
+        petal.style.left = Math.random() * 100 + "vw";
+        petal.style.animationDelay = Math.random() * 5 + "s";
+        petal.style.animationDuration = (Math.random() * 5 + 5) + "s";
+        petal.style.fontSize = (Math.random() * 20 + 20) + "px";
+        petalsContainer.appendChild(petal);
+      }
+    }
+
+    /********** RESIZE & INIT GAME **********/
+    window.addEventListener("resize", resizeCanvas);
+    function resizeCanvas() {
+      canvas.width = window.innerWidth * 0.9;
+      canvas.height = window.innerHeight * 0.9;
+      initializeGameObjects();
+    }
+    function initializeGameObjects() {
+      console.log("Initializing game objects...");
+      catFoodsEaten = 0;
+      catFoodsSpawned = 0;
+      catFoodsOnField = [];
+      lives = 9;
+      updateCounter();
+      spawnNextBatch(5);
+      obstacle.x = canvas.width * 0.5;
+      obstacle.y = canvas.height * 0.3;
+      obstacle.speedX = 2;
+      obstacle.speedY = 2;
+      gameSolved = false;
+      continueBtn.style.display = "none";
+    }
+    function spawnNextBatch(num) {
+      for (let i = 0; i < num; i++) {
+        if (catFoodsSpawned >= totalCatFoods) break;
+        const x = Math.random() * (canvas.width - 30);
+        const y = Math.random() * (canvas.height - 30);
+        catFoodsOnField.push({ x, y, size: 30, collected: false });
+        catFoodsSpawned++;
+      }
+    }
+    function updateCounter() {
+      counterDiv.textContent = `Cat food: ${catFoodsEaten}/${totalCatFoods}   Lives: ${lives}`;
+    }
+
+    /********** KEY EVENT LISTENERS **********/
+    window.addEventListener("keydown", e => { keys[e.key] = true; });
+    window.addEventListener("keyup", e => { keys[e.key] = false; });
+
+    /********** GAME LOOP **********/
+    function updateGame() {
+      // Movement
+      if (keys["ArrowUp"] || keys["w"]) character.y -= character.speed;
+      if (keys["ArrowDown"] || keys["s"]) character.y += character.speed;
+      if (keys["ArrowLeft"] || keys["a"]) character.x -= character.speed;
+      if (keys["ArrowRight"] || keys["d"]) character.x += character.speed;
+
+      // Boundaries
+      if (character.x < 0) character.x = 0;
+      if (character.y < 0) character.y = 0;
+      if (character.x + character.width > canvas.width)
+        character.x = canvas.width - character.width;
+      if (character.y + character.height > canvas.height)
+        character.y = canvas.height - character.height;
+
+      // Move dog & bounce
+      obstacle.x += obstacle.speedX;
+      obstacle.y += obstacle.speedY;
+      if (obstacle.x < 0 || obstacle.x + obstacle.width > canvas.width)
+        obstacle.speedX = -obstacle.speedX;
+      if (obstacle.y < 0 || obstacle.y + obstacle.height > canvas.height)
+        obstacle.speedY = -obstacle.speedY;
+
+      // Cat vs dog
+      if (checkRectCollision(character, obstacle)) {
+        lives--;
+        updateCounter();
+        if (lives > 0) {
+          character.x = 50;
+          character.y = 50;
+        } else {
+          initializeGameObjects();
+        }
+      }
+
+      // Cat vs cat foods
+      catFoodsOnField.forEach(food => {
+        if (!food.collected && checkRectCollision(character, {
+          x: food.x, y: food.y, width: food.size, height: food.size
+        })) {
+          food.collected = true;
+          catFoodsEaten++;
+          updateCounter();
+          eatSound.currentTime = 0;
+          eatSound.play();
+          // spawn next batch & speed up dog slightly every 5
+          if (catFoodsEaten % 5 === 0 && catFoodsSpawned < totalCatFoods) {
+            spawnNextBatch(5);
+            obstacle.speedX *= 1.05;
+            obstacle.speedY *= 1.05;
+          }
+        }
+      });
+
+      // If done => show continue
+      if (!gameSolved && catFoodsEaten >= totalCatFoods) {
+        gameSolved = true;
+        continueBtn.style.display = "inline-block";
+      }
+    }
+    function checkRectCollision(a, b) {
+      return (
+        a.x < b.x + b.width &&
+        a.x + a.width > b.x &&
+        a.y < b.y + b.height &&
+        a.y + a.height > b.y
+      );
+    }
+    function drawGame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      catFoodsOnField.forEach(food => {
+        if (!food.collected) {
+          ctx.font = food.size + "px serif";
+          ctx.fillStyle = "#000";
+          ctx.fillText("🐟", food.x, food.y + food.size);
+        }
+      });
+      ctx.font = obstacle.width + "px serif";
+      ctx.fillText("🐶", obstacle.x, obstacle.y + obstacle.height);
+      ctx.font = character.width + "px serif";
+      const catEmoji = (catFrameIndex === 0) ? "🐱" : "😺";
+      if (playerName) {
+        ctx.font = "20px sans-serif";
+        ctx.fillStyle = "#000";
+        ctx.fillText(playerName, character.x, character.y - 10);
+        ctx.font = character.width + "px serif";
+      }
+      ctx.fillText(catEmoji, character.x, character.y + character.height);
+    }
+    function gameLoop() {
+      updateGame();
+      drawGame();
+      frameCount++;
+      // Switch cat emoji every 10 frames
+      if (frameCount % 10 === 0) {
+        catFrameIndex = (catFrameIndex + 1) % 2;
+      }
+      if (!gameSolved) {
+        requestAnimationFrame(gameLoop);
+      } else {
+        drawGame();
+      }
+    }
+
+    /********** CONTINUE & SKIP BUTTONS **********/
+    continueBtn.addEventListener("click", function() {
+      showSurpriseScene();
+    });
+    skipBtn.addEventListener("click", function() {
+      showSurpriseScene();
+    });
+
+    function showSurpriseScene() {
+      // Hide the mini-game
+      miniGameContainer.style.display = "none";
+      counterDiv.style.display = "none";
+
+      // Show dim overlay
+      dimOverlay.style.display = "block";
+      // Show final scene in center
+      finalScene.style.display = "block";
+
+      window.scrollTo(0, 0);
+      bgMusic.play();
+      startSlideshow();
+    }
+
+    /********** SLIDESHOW (9 images) **********/
+    function startSlideshow() {
+      slideshowContainer.innerHTML = "";
+      currentSlideIndex = 0;
+      const slideImg = document.createElement("img");
+      slideImg.src = slideshowImages[currentSlideIndex];
+      slideImg.classList.add("active");
+      slideshowContainer.appendChild(slideImg);
+
+      setInterval(() => {
+        currentSlideIndex = (currentSlideIndex + 1) % slideshowImages.length;
+        slideImg.src = slideshowImages[currentSlideIndex];
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
